@@ -4,13 +4,13 @@ module Cartridge (Cartridge, parseCartridge) where
 import           Control.Monad        (when)
 import           Data.Binary.Get
 import           Data.Bits
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as BS
 import           Data.Word
 
 data Cartridge = Cartridge
     { header     :: Header
-    , prgRomData :: BL.ByteString
-    , chrRomData :: BL.ByteString
+    , prgRomData :: BS.ByteString
+    , chrRomData :: BS.ByteString
     } deriving (Show)
 
 parseCartridge :: Get Cartridge
@@ -21,10 +21,10 @@ parseCartridge = do
         skip 512
 
     let prgRomLength = 16384 * fromIntegral (prgRomSize header')
-    prgRomData' <- getLazyByteString prgRomLength
+    prgRomData' <- getByteString prgRomLength
 
     let chrRomLength = 8192 * fromIntegral (chrRomSize header')
-    chrRomData' <- getLazyByteString chrRomLength
+    chrRomData' <- getByteString chrRomLength
 
     return $ Cartridge header' prgRomData' chrRomData'
 
