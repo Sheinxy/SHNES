@@ -1,6 +1,6 @@
 module Main where
 
-import           Cartridge
+import           Emulator.Cartridge
 import           Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import           System.Environment
