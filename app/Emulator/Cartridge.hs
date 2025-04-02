@@ -1,7 +1,7 @@
 {-# LANGUAGE BinaryLiterals #-}
-module Emulator.Cartridge (Cartridge, parseCartridge) where
+module Emulator.Cartridge (Cartridge(..), parseCartridge) where
 
-import           Control.Monad        (when)
+import           Control.Monad   (when)
 import           Data.Binary.Get
 import           Data.Bits
 import qualified Data.ByteString as BS

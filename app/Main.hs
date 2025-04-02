@@ -1,8 +1,9 @@
 module Main where
 
-import           Emulator.Cartridge
 import           Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
+import           Emulator.Cartridge
+import           Emulator.RP2A03
 import           System.Environment
 import           System.Exit          (die)
 
@@ -13,5 +14,6 @@ main = do
         [romFile] -> do
             romData <- BL.readFile romFile
             let cartridge = runGet parseCartridge romData
-            print cartridge
+            cpu <- newCpu
+            print cpu
         _ -> die "Usage: SHNES <rom file>"

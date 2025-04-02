@@ -1,0 +1,50 @@
+# Cabal build artifacts
+dist/
+dist-newstyle/
+cabal.sandbox.config
+cabal-dev/
+*.cabal.work
+
+# Stack build artifacts
+.stack-work/
+.stack/
+.stack-bin/
+.stack-root/
+
+# Haskell object and binary files
+*.hi
+*.o
+*.dyn_o
+*.dyn_hi
+
+# Executables
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.out
+
+# GHCi temporary files
+.ghci_history
+.ghc.environment.*
+.ghc.*
+
+# Haskell Language Server
+.ghcide/
+.hie/
+.hie-bios/
+.hls-workspace/
+
+# Editor/IDE files
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.idea/
+.vscode/
+*.dir-locals.el
+
+# System files
+.DS_Store
+Thumbs.db
