@@ -14,6 +14,6 @@ main = do
         [romFile] -> do
             romData <- BL.readFile romFile
             let cartridge = runGet parseCartridge romData
-            cpu <- newCpu
-            print cpu
+            chip <- newRp2a03
+            print chip
         _ -> die "Usage: SHNES <rom file>"
