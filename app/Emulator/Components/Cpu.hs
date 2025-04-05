@@ -1,12 +1,13 @@
 {-# LANGUAGE BinaryLiterals #-}
-module Emulator.RP2A03.Cpu where
+module Emulator.Components.Cpu where
 
 import           Data.IORef
 import           Data.Word
-import           Numeric          (showHex)
+import           Emulator.Components.Mapper (Mapper (..), readWord)
+import           Numeric                    (showHex)
 
 -- Making a deal with the devil (this is for debugging purposes)
-import           System.IO.Unsafe (unsafePerformIO)
+import           System.IO.Unsafe           (unsafePerformIO)
 
 data Cpu = Cpu
     { registerA  :: IORef Word8 -- A is byte-wide and along with the arithmetic logic unit (ALU), supports using the status register for carrying, overflow detection, and so on.
@@ -40,11 +41,30 @@ newCpu = do
     regA <- newIORef 0
     regX <- newIORef 0
     regY <- newIORef 0
-    -- TODO: Initialise regPC with ($FFFC); this requires being able to handle mappers
-    regPC <- newIORef 0
+    regPC <- newIORef 0xC000
     regS <- newIORef 0xFD
     -- NV1BDIZC
     -- 00100100 = 0x24
     regP  <- newIORef 0b00100100
 
     return $ Cpu regA regX regY regPC regS regP
+
+setCpuRegister :: Cpu -> (Cpu -> IORef Word8) -> Word8 -> IO ()
+setCpuRegister cpu reg = writeIORef (reg cpu)
+
+setCpuPC :: Cpu -> Word16 -> IO ()
+setCpuPC cpu = writeIORef (registerPC cpu)
+
+loadNextByte :: Cpu -> Mapper -> IO Word8
+loadNextByte cpu mapper = do
+    pc <- readIORef (registerPC cpu)
+    val <- readByte mapper pc
+    modifyIORef (registerPC cpu) (+ 1)
+    return val
+
+loadNextWord :: Cpu -> Mapper -> IO Word16
+loadNextWord cpu mapper = do
+    pc <- readIORef (registerPC cpu)
+    val <- readWord mapper pc
+    modifyIORef (registerPC cpu) (+ 2)
+    return val
