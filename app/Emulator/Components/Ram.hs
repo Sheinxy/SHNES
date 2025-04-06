@@ -6,12 +6,12 @@ import           Data.Word
 type RAM = MVector.IOVector Word8
 
 -- Let's avoid magic values, because we're clean kitties
-ramSize :: Word16
-ramSize = 0x0800
+cpuRamSize :: Word16
+cpuRamSize = 0x0800
 
-newRam :: IO RAM
-newRam = do
-    MVector.replicate (fromIntegral ramSize) 0
+newCpuRam :: IO RAM
+newCpuRam = do
+    MVector.replicate (fromIntegral cpuRamSize) 0
 
 readByte :: RAM -> Int -> IO Word8
 readByte = MVector.read

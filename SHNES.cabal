@@ -63,7 +63,10 @@ executable SHNES
                       Emulator.Nes,
                       Emulator.Components.Ram,
                       Emulator.Components.Mapper,
-                      Emulator.Components.Cpu
+                      Emulator.Components.Cpu,
+                      Emulator.Cpu.Addressing,
+                      Emulator.Cpu.Opcode,
+                      Utils.Debug
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

@@ -1,10 +1,12 @@
 {-# LANGUAGE BinaryLiterals #-}
 module Emulator.Components.Cpu where
 
+import           Data.Bits
 import           Data.IORef
 import           Data.Word
-import           Emulator.Components.Mapper (Mapper (..), readWord)
-import           Numeric                    (showHex)
+import           Emulator.Components.Mapper (Mapper (..), cpuReadWord,
+                                             cpuWriteWord)
+import           Utils.Debug
 
 -- Making a deal with the devil (this is for debugging purposes)
 import           System.IO.Unsafe           (unsafePerformIO)
@@ -23,18 +25,54 @@ data Cpu = Cpu
     }
 
 instance Show Cpu where
-    show cpu = "A: " ++ showHex regA "" ++
-               ", X: " ++ showHex regX "" ++
-               ", Y: " ++ showHex regY "" ++
-               ", PC: " ++ showHex regPC "" ++
-               ", S: " ++ showHex regS "" ++
-               ", P: " ++ showHex regP ""
+    show cpu = "A: " ++ getHexRep (fromIntegral regA) ++
+               ", X: " ++ getHexRep (fromIntegral regX) ++
+               ", Y: " ++ getHexRep (fromIntegral regY) ++
+               ", PC: " ++ getHexRep (fromIntegral regPC) ++
+               ", S: " ++ getHexRep (fromIntegral regS) ++
+               ", P: " ++ getHexRep (fromIntegral regP)
             where regA = unsafePerformIO $ readIORef $ registerA cpu
                   regX = unsafePerformIO $ readIORef $ registerX cpu
                   regY = unsafePerformIO $ readIORef $ registerY cpu
                   regPC = unsafePerformIO $ readIORef $ registerPC cpu
                   regS = unsafePerformIO $ readIORef $ registerS cpu
                   regP = unsafePerformIO $ readIORef $ registerP cpu
+
+statusC :: Word8
+statusC = 1
+
+statusZ :: Word8
+statusZ = 2
+
+statusI :: Word8
+statusI = 4
+
+statusD :: Word8
+statusD = 8
+
+statusB :: Word8
+statusB = 16
+
+statusV :: Word8
+statusV = 64
+
+statusN :: Word8
+statusN = 128
+
+getCpuStatusFlag :: Word8 -> Cpu -> IO Bool
+getCpuStatusFlag flag cpu = do
+    status <- getCpuRegister registerP cpu
+    let res = (fromIntegral status .&. fromIntegral flag) :: Word8
+    return $ res /= 0
+
+setCpuStatusFlag :: Word8 -> Bool -> Cpu -> IO ()
+setCpuStatusFlag flag value cpu = do
+    status <- getCpuRegister registerP cpu
+    let status' = if value then
+                    status .|. fromIntegral flag
+                  else
+                    status .&. fromIntegral (complement flag)
+    setCpuRegister registerP cpu status'
 
 newCpu :: IO Cpu
 newCpu = do
@@ -49,22 +87,55 @@ newCpu = do
 
     return $ Cpu regA regX regY regPC regS regP
 
-setCpuRegister :: Cpu -> (Cpu -> IORef Word8) -> Word8 -> IO ()
-setCpuRegister cpu reg = writeIORef (reg cpu)
+setCpuRegister :: (Cpu -> IORef Word8) -> Cpu -> Word8 -> IO ()
+setCpuRegister reg = writeIORef . reg
+
+getCpuRegister :: (Cpu -> IORef Word8) -> Cpu -> IO Word8
+getCpuRegister reg = readIORef . reg
+
+modifyCpuRegister :: (Cpu -> IORef Word8) -> Cpu -> (Word8 -> Word8) -> IO ()
+modifyCpuRegister reg = modifyIORef . reg
 
 setCpuPC :: Cpu -> Word16 -> IO ()
 setCpuPC cpu = writeIORef (registerPC cpu)
 
+getCpuPC :: Cpu -> IO Word16
+getCpuPC = readIORef . registerPC
+
 loadNextByte :: Cpu -> Mapper -> IO Word8
 loadNextByte cpu mapper = do
     pc <- readIORef (registerPC cpu)
-    val <- readByte mapper pc
+    val <- cpuReadByte mapper pc
     modifyIORef (registerPC cpu) (+ 1)
     return val
 
 loadNextWord :: Cpu -> Mapper -> IO Word16
 loadNextWord cpu mapper = do
     pc <- readIORef (registerPC cpu)
-    val <- readWord mapper pc
+    val <- cpuReadWord mapper pc
     modifyIORef (registerPC cpu) (+ 2)
     return val
+
+pushByte :: Cpu -> Mapper -> Word8 -> IO ()
+pushByte cpu mapper value = do
+    sp <- getCpuRegister registerS cpu
+    cpuWriteByte mapper (0x0100 + fromIntegral sp) value
+    modifyCpuRegister registerS cpu (subtract 1)
+
+pushWord :: Cpu -> Mapper -> Word16 -> IO ()
+pushWord cpu mapper value = do
+    sp <- getCpuRegister registerS cpu
+    cpuWriteWord mapper (0x0100 + fromIntegral sp) value
+    modifyCpuRegister registerS cpu (subtract 2)
+
+pullByte :: Cpu -> Mapper -> IO Word8
+pullByte cpu mapper = do
+    modifyCpuRegister registerS cpu (+ 1)
+    sp <- getCpuRegister registerS cpu
+    cpuReadByte mapper (0x0100 + fromIntegral sp)
+
+pullWord :: Cpu -> Mapper -> IO Word16
+pullWord cpu mapper = do
+    modifyCpuRegister registerS cpu (+ 2)
+    sp <- getCpuRegister registerS cpu
+    cpuReadWord mapper (0x0100 + fromIntegral sp)
