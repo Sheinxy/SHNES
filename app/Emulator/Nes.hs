@@ -1,5 +1,6 @@
 module Emulator.Nes where
 
+import           Control.Monad              (when)
 import           Data.Binary.Get
 import qualified Data.ByteString.Lazy       as BL
 import           Emulator.Cartridge
@@ -7,7 +8,6 @@ import           Emulator.Components.Cpu
 import           Emulator.Components.Mapper (Mapper, mapper)
 import           Emulator.Components.Ram    (RAM, newCpuRam)
 import           Emulator.Cpu.Opcode        (cpuStep)
-import           Numeric                    (showHex)
 import           Utils.Debug
 
 data Nes = Nes
@@ -35,10 +35,12 @@ newNes romFile = do
 
 runNes :: Nes -> IO ()
 runNes nes = do
-    trace $ show cpu
     pc <- getCpuPC cpu
+    trace (getHexRep (fromIntegral pc) ++ " ")
+    trace (show cpu ++ "    ")
     cpuStep cpu mapper'
-    Control.Monad.when (pc /= 0xC66E) $
+    trace "\n"
+    when (pc /= 0xC66E) $
         runNes nes
     where cpu = nesCpu nes
           mapper' = nesMapper nes

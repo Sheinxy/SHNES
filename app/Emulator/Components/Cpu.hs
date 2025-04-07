@@ -53,6 +53,9 @@ statusD = 8
 statusB :: Word8
 statusB = 16
 
+status1 :: Word8
+status1 = 32
+
 statusV :: Word8
 statusV = 64
 
@@ -124,9 +127,11 @@ pushByte cpu mapper value = do
 
 pushWord :: Cpu -> Mapper -> Word16 -> IO ()
 pushWord cpu mapper value = do
-    sp <- getCpuRegister registerS cpu
-    cpuWriteWord mapper (0x0100 + fromIntegral sp) value
-    modifyCpuRegister registerS cpu (subtract 2)
+    let lo = fromIntegral value
+    let hi = fromIntegral value `shiftR` 8 :: Word16
+
+    pushByte cpu mapper (fromIntegral hi)
+    pushByte cpu mapper lo
 
 pullByte :: Cpu -> Mapper -> IO Word8
 pullByte cpu mapper = do
@@ -136,6 +141,6 @@ pullByte cpu mapper = do
 
 pullWord :: Cpu -> Mapper -> IO Word16
 pullWord cpu mapper = do
-    modifyCpuRegister registerS cpu (+ 2)
-    sp <- getCpuRegister registerS cpu
-    cpuReadWord mapper (0x0100 + fromIntegral sp)
+    lo <- pullByte cpu mapper
+    hi <- pullByte cpu mapper
+    return $ (fromIntegral hi `shiftL` 8) + fromIntegral lo

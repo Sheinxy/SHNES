@@ -10,5 +10,5 @@ debugOn :: Bool
 debugOn = True
 
 trace :: String -> IO ()
-trace | debugOn = putStrLn
+trace | debugOn = putStr
       | otherwise = const $ pure ()
