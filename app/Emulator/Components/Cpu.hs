@@ -4,8 +4,7 @@ module Emulator.Components.Cpu where
 import           Data.Bits
 import           Data.IORef
 import           Data.Word
-import           Emulator.Components.Mapper (Mapper (..), cpuReadWord,
-                                             cpuWriteWord)
+import           Emulator.Components.Mapper (Mapper (..), cpuReadWord)
 import           Utils.Debug
 
 -- Making a deal with the devil (this is for debugging purposes)
@@ -22,6 +21,7 @@ data Cpu = Cpu
     , registerS  :: IORef Word8
     -- P has 6 bits used by the ALU but is byte-wide. PHP, PLP, arithmetic, testing, and branch instructions can access this register. See status flags.
     , registerP  :: IORef Word8
+    , cpuCycle   :: IORef Int
     }
 
 instance Show Cpu where
@@ -30,13 +30,15 @@ instance Show Cpu where
                ", Y: " ++ getHexRep (fromIntegral regY) ++
                ", PC: " ++ getHexRep (fromIntegral regPC) ++
                ", S: " ++ getHexRep (fromIntegral regS) ++
-               ", P: " ++ getHexRep (fromIntegral regP)
+               ", P: " ++ getHexRep (fromIntegral regP) ++
+               ", CYC: " ++ show cyc
             where regA = unsafePerformIO $ readIORef $ registerA cpu
                   regX = unsafePerformIO $ readIORef $ registerX cpu
                   regY = unsafePerformIO $ readIORef $ registerY cpu
                   regPC = unsafePerformIO $ readIORef $ registerPC cpu
                   regS = unsafePerformIO $ readIORef $ registerS cpu
                   regP = unsafePerformIO $ readIORef $ registerP cpu
+                  cyc = unsafePerformIO $ readIORef $ cpuCycle cpu
 
 statusC :: Word8
 statusC = 1
@@ -88,7 +90,8 @@ newCpu = do
     -- 00100100 = 0x24
     regP  <- newIORef 0b00100100
 
-    return $ Cpu regA regX regY regPC regS regP
+    cyc <- newIORef 7
+    return $ Cpu regA regX regY regPC regS regP cyc
 
 setCpuRegister :: (Cpu -> IORef Word8) -> Cpu -> Word8 -> IO ()
 setCpuRegister reg = writeIORef . reg
@@ -144,3 +147,6 @@ pullWord cpu mapper = do
     lo <- pullByte cpu mapper
     hi <- pullByte cpu mapper
     return $ (fromIntegral hi `shiftL` 8) + fromIntegral lo
+
+incrementCycle :: Cpu -> Int -> IO ()
+incrementCycle cpu cyc = modifyIORef (cpuCycle cpu) (+ cyc)

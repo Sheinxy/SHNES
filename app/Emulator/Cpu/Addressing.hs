@@ -1,10 +1,13 @@
-module Emulator.Cpu.Addressing (AddressingMode (..), Indexing (..), getTraceString, getOperandAddress) where
+module Emulator.Cpu.Addressing (AddressingMode (..), Indexing (..), getTraceString, getOperandAddress, getStoreAddress, getJmpAddress, pageCrossed) where
 
+import           Control.Monad              (when)
+import           Data.Bits                  (shiftL, (.&.), (.|.))
 import           Data.Int                   (Int8)
 import           Data.Word
 import           Emulator.Components.Cpu    (Cpu (registerX, registerY),
                                              getCpuPC, getCpuRegister,
-                                             loadNextByte, loadNextWord)
+                                             incrementCycle, loadNextByte,
+                                             loadNextWord)
 import           Emulator.Components.Mapper (Mapper (cpuReadByte), cpuReadWord)
 import           Utils.Debug
 
@@ -32,9 +35,33 @@ getTraceString (Indirect None) addr value = "($" ++ getHexRep addr ++ ") = " ++ 
 getTraceString (Indirect X) addr value = "($" ++ getHexRep addr ++ " + X) = " ++ getHexRep value
 getTraceString (Indirect Y) addr value = "($" ++ getHexRep addr ++ ") + Y = " ++ getHexRep value
 
--- https://www.nesdev.org/wiki/CPU_addressing_modes
+pageCrossed :: Word16 -> Word16 -> Bool
+pageCrossed addr1 addr2 = (addr1 .&. 0xFF00) /= (addr2 .&. 0xFF00)
+
 getOperandAddress :: Cpu -> Mapper -> AddressingMode -> IO Word16
-getOperandAddress cpu mapper mode = case mode of
+getOperandAddress = getOperandAddress' True
+
+-- Indirect jump has a bug where reading a word from 0xYYFF will read
+-- The first byte from 0xYYFF and the second from 0xYY00 instead of 0xYZ00
+getJmpAddress :: Cpu -> Mapper -> AddressingMode -> IO Word16
+getJmpAddress cpu mapper (Absolute None) = getOperandAddress cpu mapper (Absolute None)
+getJmpAddress cpu mapper _ = do
+    addr <- loadNextWord cpu mapper
+    unsplit <- cpuReadWord mapper addr
+
+    lo <- cpuReadByte mapper addr
+    hi <- cpuReadByte mapper (addr .&. 0xFF00)
+    return $
+        if (addr .&. 0xFF) == 0xFF
+        then (fromIntegral hi `shiftL` 8) .|. fromIntegral lo
+        else unsplit
+
+getStoreAddress :: Cpu -> Mapper -> AddressingMode -> IO Word16
+getStoreAddress = getOperandAddress' False
+
+-- https://www.nesdev.org/wiki/CPU_addressing_modes
+getOperandAddress' :: Bool -> Cpu -> Mapper -> AddressingMode -> IO Word16
+getOperandAddress' addCycleOnPageCross cpu mapper mode = case mode of
     Implied -> return 0
     Accumulator -> return 0
     Immediate -> do
@@ -53,7 +80,11 @@ getOperandAddress cpu mapper mode = case mode of
     Absolute indexing -> do
         idx <- getIndexOffset indexing cpu
         addr <- loadNextWord cpu mapper
-        return (fromIntegral addr + fromIntegral idx)
+        let result = fromIntegral addr + fromIntegral idx
+        when addCycleOnPageCross $
+            when (pageCrossed addr result) $
+                incrementCycle cpu 1
+        return result
     Indirect None -> do
         addr <- loadNextWord cpu mapper
         cpuReadWord mapper addr
@@ -73,4 +104,10 @@ getOperandAddress cpu mapper mode = case mode of
         lo <- cpuReadByte mapper $ fromIntegral arg
         hi <- cpuReadByte mapper $ (fromIntegral arg + 1) `mod` 256
 
-        return $ fromIntegral y + fromIntegral lo + fromIntegral hi * 256
+        let addr = fromIntegral lo + fromIntegral hi * 256
+        let result = fromIntegral y + addr
+        when addCycleOnPageCross $
+            when (pageCrossed addr result) $
+                incrementCycle cpu 1
+        return result
+
